@@ -1,4 +1,5 @@
 use scraper::{Html, Selector};
+use std::env;
 use std::error::Error;
 
 fn fetch_page(url: &str) -> Result<String, reqwest::Error> {
@@ -13,24 +14,38 @@ fn make_selector(css: &str) -> Result<Selector, String> {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
-    let url = "https://www.rust-lang.org";
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        return Err("Usage: cargo run -- <url> [selector]".into());
+    }
+
+    let url = &args[1];
+    let match_css = args.get(2).map(|s| s.as_str()).unwrap_or("h1, h2, h3");
+
     let body = fetch_page(url)?;
     let document = Html::parse_document(&body);
 
-    let heading_selector = make_selector("h1, h2, h3")?;
-    println!("Headings:");
-    for heading in document.select(&heading_selector) {
-        let text = heading.text().collect::<String>();
-        println!("  - {}", text);
+    let match_selector = make_selector(match_css)?;
+    println!("Matches for '{}':", match_css);
+    let mut match_count = 0;
+    for element in document.select(&match_selector) {
+        let text = element.text().collect::<String>();
+        println!("  - {}", text.trim());
+        match_count += 1;
     }
+    println!("  ({} found)", match_count);
 
     let link_selector = make_selector("a")?;
     println!("\nLinks:");
+    let mut link_count = 0;
     for link in document.select(&link_selector) {
         if let Some(href) = link.value().attr("href") {
             println!("  - {}", href);
+            link_count += 1;
         }
     }
+    println!("  ({} found)", link_count);
 
     Ok(())
 }
